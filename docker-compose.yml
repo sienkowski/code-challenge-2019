@@ -1,22 +1,6 @@
 version: '2'
 services:
 
-  dask-worker:
-    image: drtools/dask:latest
-    command: dask-worker dask-scheduler:8786
-    volumes:
-      - ./data_root:/usr/share/data/
-    depends_on:
-      - dask-scheduler
-
-  dask-scheduler:
-    image: drtools/dask:latest
-    command: dask-scheduler
-    volumes:
-      - ./data_root:/usr/share/data/
-    ports:
-      - "8787:8787"
-
   luigid:
     image: code-challenge/orchestrator:latest
     build:
@@ -29,7 +13,6 @@ services:
     image: code-challenge/orchestrator:latest
     depends_on:
       - luigid
-      - dask-scheduler
     environment:
       - PROJECT_ROOT=$PWD
       - PIPELINE_VERSION=0.1
@@ -39,5 +22,4 @@ services:
       - ./orchestrator:/opt/orchestrator # Mount code for faster development
     build:
       context: ./orchestrator
-    # TODO: Replace with EvaluateModel task
-    command: luigi --module task DownloadData --scheduler-host luigid
+    command: luigi --module task EvaluateModel --scheduler-host luigid

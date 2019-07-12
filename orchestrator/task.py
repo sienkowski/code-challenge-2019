@@ -51,13 +51,15 @@ class DownloadData(DockerTask):
         out_dir.mkdir(parents=True, exist_ok=True)
 
         return luigi.LocalTarget(
-            path=str(out_dir/f'{self.name}.csv')
+            path=str(out_dir/f'{self.fname}.csv')
         )
 
 
 class MakeDatasets(DockerTask):
 
-    out_dir = luigi.Parameter()
+    in_csv = luigi.Parameter(default='wine_dataset.csv')
+    in_dir = luigi.Parameter(default='/usr/share/data/raw/')
+    out_dir = luigi.Parameter(default='/usr/share/data/split_data')
 
     @property
     def image(self):
@@ -66,12 +68,89 @@ class MakeDatasets(DockerTask):
     def requires(self):
         return DownloadData()
 
+    @property
     def command(self):
-        # TODO: implement correct command
-        # Try to get the input path from self.requires() ;)
-        pass
+        # TODO: Try to get the input path from self.requires() ;)
+        return [
+            'python', 'make_dataset.py',
+            '--in-csv', self.in_csv,
+            '--in-dir', self.in_dir,
+            '--out-dir', self.out_dir
+        ]
 
     def output(self):
+        out_dir = Path(self.out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+
         return luigi.LocalTarget(
-            path=str(Path(self.out_dir) / '.SUCCESS')
+            path=str(out_dir / '.SUCCESS')
+        )
+
+
+class TrainModel(DockerTask):
+
+    X_train = luigi.Parameter(default='X_train.csv')
+    y_train = luigi.Parameter(default='y_train.csv')
+    in_dir = luigi.Parameter(default='/usr/share/data/split_data')
+    out_dir = luigi.Parameter(default='/usr/share/data/model')
+
+    @property
+    def image(self):
+        return f'code-challenge/train-model:{VERSION}'
+    
+    def requires(self):
+        return MakeDatasets()
+    
+    @property
+    def command(self):
+        return [
+            'python', 'train_model.py',
+            '--x-train', self.X_train,
+            '--y-train', self.y_train,
+            '--in-dir', self.in_dir,
+            '--out-dir', self.out_dir
+        ]
+    
+    # TODO: Fix the output
+    def output(self):
+        out_dir = Path(self.out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        return luigi.LocalTarget(
+            path=str(out_dir / 'model.joblib')
+        )
+
+
+class EvaluateModel(DockerTask):
+
+    X_test = luigi.Parameter(default='X_test.csv')
+    y_test = luigi.Parameter(default='y_test.csv')
+    model_path = luigi.Parameter(default='/usr/share/data/model/model.joblib')
+    in_dir = luigi.Parameter(default='/usr/share/data/split_data')
+    out_dir = luigi.Parameter(default='/usr/share/data/evaluate_model')
+
+    @property
+    def image(self):
+        return f'code-challenge/evaluate-model:{VERSION}'
+    
+    def requires(self):
+        return TrainModel()
+    
+    @property
+    def command(self):
+        return [
+            'python', 'evaluate.py',
+            '--x-test', self.X_test,
+            '--y-test', self.y_test,
+            '--model-path', self.model_path,
+            '--in-dir', self.in_dir,
+            '--out-dir', self.out_dir
+        ]
+    
+    def output(self):
+        out_dir = Path(self.out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        return luigi.LocalTarget(
+            path=str(out_dir / 'confusion_matrix.png')
         )
