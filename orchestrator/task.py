@@ -51,13 +51,14 @@ class DownloadData(DockerTask):
         out_dir.mkdir(parents=True, exist_ok=True)
 
         return luigi.LocalTarget(
-            path=str(out_dir/f'{self.name}.csv')
+            path=str(out_dir/f'{self.fname}.csv')
         )
 
 
 class MakeDatasets(DockerTask):
+    """Create training and test set"""
 
-    out_dir = luigi.Parameter()
+    out_dir = luigi.Parameter(default='/usr/share/data/interim/')
 
     @property
     def image(self):
@@ -66,12 +67,41 @@ class MakeDatasets(DockerTask):
     def requires(self):
         return DownloadData()
 
+    @property
     def command(self):
         # TODO: implement correct command
         # Try to get the input path from self.requires() ;)
-        pass
+
+        return [
+            'python', 'dataset.py',
+            '--in-csv', self.input().path,
+            '--out-dir', self.out_dir
+        ]
 
     def output(self):
+        out_dir = Path(self.out_dir)
+
         return luigi.LocalTarget(
-            path=str(Path(self.out_dir) / '.SUCCESS')
+            path=str(out_dir / '.SUCCESS')
         )
+
+
+class TransformData(DockerTask):
+
+    @property
+    def image(self):
+        return f'code-challenge/make-dataset:{VERSION}'
+
+
+class TrainModel(DockerTask):
+
+    @property
+    def image(self):
+        return f'code-challenge/make-dataset:{VERSION}'
+
+
+class MakePredictions(DockerTask):
+
+    @property
+    def image(self):
+        return f'code-challenge/make-dataset:{VERSION}'

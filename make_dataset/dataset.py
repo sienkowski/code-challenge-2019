@@ -3,6 +3,7 @@ import dask.dataframe as dd
 import numpy as np
 from distributed import Client
 from pathlib import Path
+import pandas as pd
 
 
 def _save_datasets(train, test, outdir: Path):
@@ -24,18 +25,36 @@ def make_datasets(in_csv, out_dir):
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    # Get datatypes of each column.
+    datatypes = {
+        "Unnamed: 0": "int64",
+        "country": "object",
+        "description": "object",
+        "designation": "object",
+        "points": "int64",
+        "price": "float64",
+        "province": "object",
+        "region_1": "object",
+        "region_2": "object",
+        "taster_name": "object",
+        "taster_twitter_handle": "object",
+        "title": "object",
+        "variety": "object",
+        "winery": "object"
+    }
+
     # Connect to the dask cluster
-    c = Client('dask-scheduler:8786')
+    #c = Client('dask-scheduler:8786')
 
     # load data as a dask Dataframe if you have trouble with dask
     # please fall back to pandas or numpy
-    ddf = dd.read_csv(in_csv, blocksize=1e6)
+    df = pd.read_csv(in_csv, dtype=datatypes)
 
     # we set the index so we can properly execute loc below
-    ddf = ddf.set_index('Unnamed: 0')
+    df_keep = df[['description', 'points']].loc[:]
 
     # trigger computation
-    n_samples = len(ddf)
+    n_samples = len(df_keep)
 
     # TODO: implement proper dataset creation here
     # http://docs.dask.org/en/latest/dataframe-api.html
@@ -43,10 +62,10 @@ def make_datasets(in_csv, out_dir):
     # split dataset into train test feel free to adjust test percentage
     idx = np.arange(n_samples)
     test_idx = idx[:n_samples // 10]
-    test = ddf.loc[test_idx]
+    test = df_keep.loc[test_idx]
 
     train_idx = idx[n_samples // 10:]
-    train = ddf.loc[train_idx]
+    train = df_keep.loc[train_idx]
 
     _save_datasets(train, test, out_dir)
 
